@@ -1,0 +1,3 @@
+<Addon Author="Aramunn" APIVersion="16" Version="1.Wow" Name="Wow" Description="Wow">
+  <Script Name="Wow.lua"/>
+</Addon>
