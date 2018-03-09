@@ -17,7 +17,7 @@ local Wow = {
   tSeenSpells = {},
   tSave = {
     bEnabled    = true,
-    nTimeout    = 2,
+    nTimeout    = 0.5,
     eRankMin    = Unit.CodeEnumRank.Champion,
     bTargetOnly = false,
     eFiltering  = FilteringEnum.Off,
@@ -26,7 +26,7 @@ local Wow = {
   }
 }
 
-local knFiles     = 1
+local knFiles     = 25
 local kstrIndent  = "     "
 
 local karRanks = {}
@@ -81,7 +81,7 @@ local karCommands = {
       local nTimeout = tonumber(strParam)
       if nTimeout then
         ref.tSave.nTimeout = nTimeout
-        self:UpdateTimeoutTimer()
+        ref:UpdateTimeoutTimer()
         ref:SysPrint("Updated timeout to "..tostring(nTimeout).." seconds")
       else
         ref:SysPrint("Use \"timeout #\"")
@@ -121,7 +121,7 @@ local karCommands = {
     end
   }, {
     strCmd = "filtering",
-    strDescription = "options for filtering",
+    strDescription = "select type of filtering or turn off",
     funcCmd = function(ref, strParam)
       if strParam == "blacklist" then
         ref.tSave.eFiltering = FilteringEnum.Blacklist
@@ -138,7 +138,7 @@ local karCommands = {
     end
   }, {
     strCmd = "blacklist",
-    strDescription = "make changes to the blacklist",
+    strDescription = "view or make changes to the blacklist",
     funcCmd = function(ref, strParam)
       local strOp, strNums = string.match(strParam, "^([+-])(.*)")
       if strOp and strNums then
@@ -146,15 +146,28 @@ local karCommands = {
           local nSpellId = tonumber(strNum)
           ref.tSave.tBlacklist[nSpellId] = strOp == "+" or nil
         end
+      elseif strParam == "view" then
+        local arSpells = {}
+        for nSpellId in pairs(ref.tSave.tBlacklist) do
+          local spell = GameLib.GetSpell(nSpellId)
+          table.insert(arSpells, spell:GetName().." ["..nSpellId.."]")
+        end
+        if #arSpells == 0 then
+          ref:SysPrint("Nothing in blacklist")
+        end
+        table.sort(arSpells)
+        ref:SysPrint("Blacklist:")
+        for _, strSpell in ipairs(arSpells) do ref:SysPrint("  "..strSpell) end
       else
-        ref:SysPrint("Use \"blacklist OP SPELLIDS\"")
+        ref:SysPrint("To view use \"blacklist view\"")
+        ref:SysPrint("To change use \"blacklist OP SPELLIDS\"")
         ref:SysPrint("  OP - +/- to add/remove")
-        ref:SysPrint("  SPELLIDS - list of space seperated spell ids")
+        ref:SysPrint("  SPELLIDS - list of space separated spell ids")
       end
     end
   }, {
     strCmd = "whitelist",
-    strDescription = "make changes to the whitelist",
+    strDescription = "view or make changes to the whitelist",
     funcCmd = function(ref, strParam)
       local strOp, strNums = string.match(strParam, "^([+-])(.*)")
       if strOp and strNums then
@@ -162,10 +175,23 @@ local karCommands = {
           local nSpellId = tonumber(strNum)
           ref.tSave.tWhitelist[nSpellId] = strOp == "+" or nil
         end
+      elseif strParam == "view" then
+        local arSpells = {}
+        for nSpellId in pairs(ref.tSave.tWhitelist) do
+          local spell = GameLib.GetSpell(nSpellId)
+          table.insert(arSpells, spell:GetName().." ["..nSpellId.."]")
+        end
+        if #arSpells == 0 then
+          ref:SysPrint("Nothing in whitelist")
+        end
+        table.sort(arSpells)
+        ref:SysPrint("Whitelist:")
+        for _, strSpell in ipairs(arSpells) do ref:SysPrint("  "..strSpell) end
       else
-        ref:SysPrint("Use \"whitelist OP SPELLIDS\"")
+        ref:SysPrint("To view use \"whitelist view\"")
+        ref:SysPrint("To change use \"whitelist OP SPELLIDS\"")
         ref:SysPrint("  OP - +/- to add/remove")
-        ref:SysPrint("  SPELLIDS - list of space seperated spell ids")
+        ref:SysPrint("  SPELLIDS - list of space separated spell ids")
       end
     end
   }
@@ -180,11 +206,11 @@ function Wow:OnCombatLogEvent(tArgs)
   if not self.tSave.bEnabled then return end
   if tArgs.unitCaster ~= GameLib.GetPlayerUnit() then return end
   local nSpellId = tArgs.splCallingSpell:GetId()
-  if self.eFiltering == FilteringEnum.Blacklist then
-    if self.tBlacklist[nSpellId] then return end
+  if self.tSave.eFiltering == FilteringEnum.Blacklist then
+    if self.tSave.tBlacklist[nSpellId] then return end
   end
-  if self.eFiltering == FilteringEnum.Whitelist then
-    if not self.tWhitelist[nSpellId] then return end
+  if self.tSave.eFiltering == FilteringEnum.Whitelist then
+    if not self.tSave.tWhitelist[nSpellId] then return end
   end
   if self.eShowSpells == ShowSpellEnum.All and not self.tSeenSpells[nSpellId] then
     self:SysPrint(tArgs.splCallingSpell:GetName().." ["..nSpellId.."]")
@@ -243,6 +269,17 @@ function Wow:PrintHelp()
   strCurrent = strCurrent..", ".."timeout = "..tostring(self.tSave.nTimeout)
   strCurrent = strCurrent..", ".."minrank = "..tostring(self.tSave.eRankMin)
   if self.tSave.bTargetOnly then strCurrent = strCurrent..", Target-Only" end
+  if self.tSave.eFiltering ~= FilteringEnum.Off then
+    local strCurrentFilter = nil
+    for k,v in pairs(FilteringEnum) do
+      if self.tSave.eFiltering == v then
+        strCurrentFilter = k
+      end
+    end
+    if strCurrentFilter then
+      strCurrent = strCurrent..", "..strCurrentFilter
+    end
+  end
   self:SysPrint("Current Settings: "..strCurrent)
 end
 
